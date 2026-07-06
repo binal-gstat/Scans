@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>דשבורד סריקת מסמכים</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jose@5"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #333; }
+
+        #loginScreen {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        #loginScreen h1 { color: #fff; font-size: 2.5rem; margin-bottom: 2rem; }
+        #loginScreen input { padding: 12px 20px; font-size: 1.1rem; border: none; border-radius: 8px;
+            width: 260px; text-align: center; outline: none; }
+        #loginScreen button { padding: 12px 30px; font-size: 1.1rem; border: none; border-radius: 8px;
+            background: #4CAF50; color: #fff; cursor: pointer; margin-top: 1rem; width: 260px; font-weight: bold; }
+        #loginScreen button:hover { background: #45a049; }
+        #loginError { color: #ff6b6b; margin-top: 0.5rem; font-size: 0.95rem; }
+
+        #dashboard { display: none; max-width: 1300px; margin: 0 auto; padding: 15px; }
+
+        .header { text-align: center; padding: 20px 0; }
+        .header h1 { font-size: 2rem; color: #2c3e50; }
+
+        .kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin: 15px 0; }
+        .kpi-card { background: #fff; border-radius: 12px; padding: 18px 10px; text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .kpi-card .label { font-size: 0.8rem; color: #7f8c8d; margin-bottom: 6px; }
+        .kpi-card .value { font-size: 1.6rem; font-weight: bold; color: #2c3e50; }
+
+        .celebration { text-align: center; padding: 25px; margin: 15px 0; border-radius: 12px;
+            font-size: 1.4rem; font-weight: bold; display: none; }
+        .celebration.gold { background: #fff3cd; color: #856404; border: 2px solid #ffc107; display: block; }
+        .celebration.green { background: #d4edda; color: #155724; border: 2px solid #28a745; display: block; }
+
+        .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0; }
+        .chart-box { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .chart-box h2 { font-size: 1.05rem; color: #2c3e50; margin-bottom: 12px; }
+
+        .controls { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; align-items: start; }
+        .controls h2 { font-size: 1.05rem; margin-bottom: 10px; color: #2c3e50; }
+        .controls input[type="number"] { width: 100%; padding: 10px; font-size: 1rem; border: 1px solid #ddd;
+            border-radius: 8px; text-align: center; }
+        .controls button { width: 100%; padding: 10px; font-size: 0.95rem; border: none; border-radius: 8px;
+            cursor: pointer; color: #fff; font-weight: bold; margin-top: 6px; }
+        .btn-update { background: #4CAF50; }
+        .btn-update:hover { background: #45a049; }
+        .btn-delete { background: #e74c3c; }
+        .btn-delete:hover { background: #c0392b; }
+        .btn-reset { background: #e67e22; }
+        .btn-reset:hover { background: #d35400; }
+        .btn-logout { background: #95a5a6; }
+        .btn-logout:hover { background: #7f8c8d; }
+
+        .msg { padding: 10px; border-radius: 8px; margin-top: 8px; text-align: center; display: none; font-weight: bold; }
+        .msg.success { background: #d4edda; color: #155724; display: block; }
+        .msg.warning { background: #fff3cd; color: #856404; display: block; }
+        .msg.error { background: #f8d7da; color: #721c24; display: block; }
+
+        .data-table { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin: 15px 0; }
+        .data-table h2 { font-size: 1.05rem; margin-bottom: 10px; cursor: pointer; user-select: none; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; text-align: center; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; color: #555; font-weight: 600; }
+        tbody tr:hover { background: #f8f9fa; }
+
+        .footer { text-align: center; padding: 20px; color: #95a5a6; font-size: 0.9rem; }
+
+        .spinner { text-align: center; padding: 20px; color: #95a5a6; }
+
+        @media (max-width: 900px) {
+            .kpi-row { grid-template-columns: repeat(3, 1fr); }
+            .charts-row { grid-template-columns: 1fr; }
+            .controls { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 500px) {
+            .kpi-row { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- מסך כניסה -->
+<!--<div id="loginScreen">
+    <h1>🔐 דשבורד סריקת מסמכים</h1>
+    <input type="password" id="passwordInput" placeholder="הכנס סיסמה" autocomplete="off">
+    <button onclick="login()">🔓 כניסה</button>
+    <div id="loginError"></div>
+</div>-->
+
+<!-- דשבורד -->
+<div id="dashboard">
+    <div class="header"><h1>📄 דשבורד סריקת מסמכים</h1></div>
+
+    <div class="celebration" id="celebration"></div>
+
+    <div class="controls">
+        <div>
+            <h2>📥 הכנסת נתונים</h2>
+            <input type="number" id="scannedInput" min="0" value="0" placeholder="מסמכים שנסרקו היום">
+            <button class="btn-update" onclick="addData()">📤 עדכן נתונים</button>
+        </div>
+        <div>
+            <h2>⚙️ ניהול נתונים</h2>
+            <button class="btn-delete" onclick="deleteLast()" id="btnDeleteLast">🗑️ מחק יום אחרון</button>
+            <button class="btn-reset" onclick="resetAll()">🔄 אפס את כל הנתונים</button>
+        </div>
+        <div>
+            <h2>👤</h2>
+            <button class="btn-logout" onclick="logout()">🚪 יציאה</button>
+        </div>
+    </div>
+    <div class="msg" id="msg"></div>
+
+    <div class="kpi-row">
+        <div class="kpi-card"><div class="label">📊 סה"כ נסרק</div><div class="value" id="kpiTotal">0</div></div>
+        <div class="kpi-card"><div class="label">🎯 אחוז מהיעד</div><div class="value" id="kpiPercent">0%</div></div>
+        <div class="kpi-card"><div class="label">📋 נותר ל-85%</div><div class="value" id="kpiRem85">0</div></div>
+        <div class="kpi-card"><div class="label">📋 נותר ל-100%</div><div class="value" id="kpiRem100">0</div></div>
+        <div class="kpi-card"><div class="label">📅 ימים נותרו</div><div class="value" id="kpiDays">0</div></div>
+        <div class="kpi-card"><div class="label">⚡ דרישה יומית</div><div class="value" id="kpiDaily">0</div></div>
+    </div>
+
+    <div class="charts-row">
+        <div class="chart-box">
+            <h2>📈 התקדמות מצטברת</h2>
+            <canvas id="chartCumulative" height="280"></canvas>
+        </div>
+        <div class="chart-box">
+            <h2>📊 סריקות יומיות</h2>
+            <canvas id="chartDaily" height="280"></canvas>
+        </div>
+    </div>
+
+    <div class="data-table">
+        <h2 onclick="toggleTable()" id="tableToggle">📋 הצג נתונים מלאים ▼</h2>
+        <div id="tableContainer" style="display:none;">
+            <table><thead><tr><th>תאריך</th><th>נסרק היום</th><th>סה"כ נסרק</th></tr></thead><tbody id="tableBody"></tbody></table>
+        </div>
+    </div>
+
+    <div class="footer">
+        יעד: 2,000,000 | 85%: 1,700,000 | תאריך סיום: 31/12/2026
+    </div>
+</div>
+
+<script>
+// ====== הגדרות ======
+const TARGET = 2000000;
+const END_DATE = new Date(2026, 11, 31);
+const APP_PASSWORD = "ganzach2424";
+const SHEET_ID = "1bXuXqZ4VLHR0bdBNveTENPK23a91LzzHlSKUqP1O0ZM";
+
+// ====== מפתח Service Account ======
+const SA = {
+    type: "service_account",
+    project_id: "srikat-mismachim",
+    private_key_id: "bfb8c43eb318045f3ce6040da9307c61f4de5119",
+    private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDSmtcbR7YVbahM\nGAaRssHkrBYshqbgw3IlOfg4yCVIaI0k1iSxb4maasA8hALjCD/IscdmEEajufgA\nQJ22BKynhd8XpEPgCCJEFAWciDQOtKDyPgP5abBAKz7+jtEovh3aAa5r4ae6ooN5\nhWzSI6vNrsKaBovpKVd2x/dm4SZzzTKgisPjOoU6ogUsZNG9BiRvBR44rWH7vF8P\nzp4ZXKis8t0N2NN4DwQNjGyN4wDRdh/KBWEEKkgrq8YrxtelWM4EycEp1Kv/Bc2a\naRcnR0/Qg+/DAh+sAyq2ZztmsNyN2D6ZK4zCEgKPNa2u7Fmv+V1O0KzmHGF0WQJB\nT8V8by/BAgMBAAECggEAARWUgBq0qd6/FCiMghwG6l07c6kRe2HuOMRYDjzI5QWg\nHRLa11dbwJcw8a7RT/zBzU/4Vu1vBlabBln5ezosxGOzTsJvqgaIsfaIwodN/fm5\nRBNZ1GMnqeY/GbLqX0NpURnF8t6+ImnF8653mAu1zaY1xh1nWNY3vHq86piZU3/L\nexsbVukwBhRE/RF5nB8pGo2lO4Chh1e8BhO+u6duWGK+wnlzQkFFE+UqJb5eutl5\nfPWPey2DvmcVsWPW9ejNvfmhf7Y7YKsMcbzTgNeaCGAgQj1PoGkqFzHDx49B9hTj\nk/A9WV8ZuASrZKYALlHBYQHtlcFpDGztuzq/96y8QQKBgQD0lf/2IdaqtGnB0oFD\nJfVIAUwuw0XQF/8DvT08Y+/ja1/5bTg2G4RaNUtctQz/UUTzDIZIZ1nhHVEnurnc\n/0xas69PyB0H3RkhCHVYoOoXGD84bsFliX8OY1mjqf06KFaK+pgLY4Weu/x2k2Fv\nC698P0dwKJBuV+K6L2WZA9aQcQKBgQDcbuC0lAltcpZKjjQ5WhnbkiQTUlrWglzJ\nScPqmu91SdnYJLxiJziIt0GZPgv1EYTRnorWjQLKIUMW9/L69yf3Do9d1oJmkD7o\niyvlN7H5s4hUKsmFrdV7FIGhm2q4NG5L/1K75SFoOVqqYRukiOWki0nQrNvTXr1a\nulyWv0E8UQKBgFzGRQf8v+uScYcmrQdmb4q3i0k1otaTM5UchAzTL5xJD2eSST8k\n4uhAzOxGdL6n+gpjVtBB+7LLJwx15KhyYmkJPVd65aAk+rIv/ir3JrRJ6zkhsdQs\n+nffsZHGGhqkUGd5NJElV/rk/ZeQweWYPiFX82YUzOw+A+9xqQ0IiqvRAoGAfPNI\n4nNrqKOkd5yGE+Bz+desJVuwbBm3OM5chLbQd76mAnRIaKbsz+p4/8GBC6ijjiL9\ndkK2SxdxrSpdjE7fU5boQ3vdrP+k+TIybpsUgoN3Cqa6VtFDyqHEHXQ4mTP3NZME\nNcfbGPYx45RqE+kZqxzdebESZo00bqJm63h8JRECgYEA6uNyB6HVqmz7i2wumEvp\nqgKJs/8SzRiEr30sxbeSnJaaYvcXBoSfCVdzbKezKmm9KqAqedSH52hmaKkFwbyz\nD/e9lstcslLksFts6+NgnTxWBgYRE1SecYMiQ0YkXQ9A5U8VfuA54U+9iSw/gTFt\nVUQiYKqZpfvIC3x3acUmqJA=\n-----END PRIVATE KEY-----\n",
+    client_email: "dashboard@srikat-mismachim.iam.gserviceaccount.com",
+    client_id: "102247000692150448386",
+    auth_uri: "https://accounts.google.com/o/oauth2/auth",
+    token_uri: "https://oauth2.googleapis.com/token",
+    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+    client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/dashboard%40srikat-mismachim.iam.gserviceaccount.com"
+};
+
+let accessToken = null;
+let tokenExpiry = 0;
+let chartCumulative = null;
+let chartDaily = null;
+
+// ====== JWT creation for Service Account ======
+async function getAccessToken() {
+    if (accessToken && Date.now() < tokenExpiry - 60000) return accessToken;
+
+    const header = { alg: "RS256", typ: "JWT" };
+    const now = Math.floor(Date.now() / 1000);
+    const claim = {
+        iss: SA.client_email,
+        scope: "https://www.googleapis.com/auth/spreadsheets",
+        aud: SA.token_uri,
+        exp: now + 3600,
+        iat: now
+    };
+
+    // יצירת JWT בעזרת Web Crypto API
+    const pemContents = SA.private_key
+        .replace("-----BEGIN PRIVATE KEY-----\n", "")
+        .replace("\n-----END PRIVATE KEY-----", "")
+        .replace(/\n/g, "");
+
+    const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+    const key = await crypto.subtle.importKey(
+        "pkcs8", binaryKey,
+        { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+        false, ["sign"]
+    );
+
+    const encoder = new TextEncoder();
+    const jwtHeader = btoa(JSON.stringify(header)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const jwtClaim = btoa(JSON.stringify(claim)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const toSign = encoder.encode(jwtHeader + "." + jwtClaim);
+
+    const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, toSign);
+    const sigBase64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+        .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+
+    const jwt = jwtHeader + "." + jwtClaim + "." + sigBase64;
+
+    // החלפת JWT באקסס טוקן
+    const resp = await fetch(SA.token_uri, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+    });
+    const data = await resp.json();
+    accessToken = data.access_token;
+    tokenExpiry = Date.now() + (data.expires_in || 3600) * 1000;
+    return accessToken;
+}
+
+// ====== API helpers ======
+async function sheetsGet() {
+    const token = await getAccessToken();
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A:C`;
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await resp.json();
+    const rows = data.values || [];
+    if (rows.length <= 1) return [];
+    return rows.slice(1).map(r => ({
+        date: r[0] || "",
+        scanned: parseInt(r[1]) || 0,
+        total: parseInt(r[2]) || 0
+    }));
+}
+
+async function sheetsAppend(dateStr, scanned, total) {
+    const token = await getAccessToken();
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+    const resp = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ values: [[dateStr, scanned, total]] })
+    });
+    return resp.ok;
+}
+
+async function sheetsDeleteLast() {
+    const token = await getAccessToken();
+    // קודם נגלה כמה שורות יש
+    const url1 = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A:A`;
+    const r1 = await fetch(url1, { headers: { Authorization: `Bearer ${token}` } });
+    const d1 = await r1.json();
+    const numRows = (d1.values || []).length;
+    if (numRows <= 1) return false;
+
+    const url2 = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`;
+    const resp = await fetch(url2, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+            requests: [{ deleteDimension: { range: { sheetId: 0, dimension: "ROWS", startIndex: numRows - 1, endIndex: numRows } } }]
+        })
+    });
+    return resp.ok;
+}
+
+async function sheetsReset() {
+    const token = await getAccessToken();
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`;
+    const resp = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+            requests: [
+                { updateCells: { range: { sheetId: 0, startRowIndex: 1, endRowIndex: 10000 }, fields: "userEnteredValue" } },
+                { deleteDimension: { range: { sheetId: 0, dimension: "ROWS", startIndex: 1, endIndex: 10000 } } }
+            ]
+        })
+    });
+    return resp.ok;
+}
+
+// ====== כניסה ======
+function login() {
+    const pw = document.getElementById("passwordInput").value;
+    if (pw === APP_PASSWORD) {
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+        document.getElementById("loginError").textContent = "";
+        loadAndRender();
+    } else {
+        document.getElementById("loginError").textContent = "❌ סיסמה שגויה";
+        document.getElementById("passwordInput").value = "";
+    }
+}
+document.getElementById("passwordInput").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+
+function logout() {
+    document.getElementById("loginScreen").style.display = "flex";
+    document.getElementById("dashboard").style.display = "none";
+    document.getElementById("passwordInput").value = "";
+    accessToken = null;
+}
+
+// ====== פעולות ======
+async function addData() {
+    const msg = document.getElementById("msg");
+    const scanned = parseInt(document.getElementById("scannedInput").value) || 0;
+    if (scanned === 0) {
+        msg.className = "msg warning"; msg.textContent = "⚠️ אנא הכנס מספר מסמכים"; return;
+    }
+
+    const data = await sheetsGet();
+    const today = new Date().toISOString().split("T")[0];
+    if (data.length > 0 && data[data.length - 1].date === today) {
+        msg.className = "msg warning"; msg.textContent = "⚠️ כבר הוכנסו נתונים להיום"; return;
+    }
+
+    const lastTotal = data.length > 0 ? data[data.length - 1].total : 0;
+    const ok = await sheetsAppend(today, scanned, lastTotal + scanned);
+    if (ok) {
+        msg.className = "msg success";
+        msg.textContent = `✅ עודכנו ${scanned.toLocaleString()} מסמכים`;
+        document.getElementById("scannedInput").value = "0";
+        await loadAndRender();
+    } else {
+        msg.className = "msg error"; msg.textContent = "❌ שגיאה בעדכון. נסה שוב.";
+    }
+}
+
+async function deleteLast() {
+    const msg = document.getElementById("msg");
+    const data = await sheetsGet();
+    if (data.length === 0) return;
+    const ok = await sheetsDeleteLast();
+    if (ok) {
+        msg.className = "msg success";
+        msg.textContent = `נמחק התאריך ${data[data.length - 1].date}`;
+        await loadAndRender();
+    } else {
+        msg.className = "msg error"; msg.textContent = "❌ שגיאה במחיקה";
+    }
+}
+
+async function resetAll() {
+    const msg = document.getElementById("msg");
+    if (!confirm("בטוח שברצונך לאפס את כל הנתונים?")) return;
+    const ok = await sheetsReset();
+    if (ok) {
+        msg.className = "msg success"; msg.textContent = "כל הנתונים נמחקו";
+        await loadAndRender();
+    } else {
+        msg.className = "msg error"; msg.textContent = "❌ שגיאה באיפוס";
+    }
+}
+
+// ====== תצוגה ======
+async function loadAndRender() {
+    try {
+        const data = await sheetsGet();
+        renderDashboard(data);
+    } catch (e) {
+        console.error(e);
+        document.getElementById("msg").className = "msg error";
+        document.getElementById("msg").textContent = "❌ שגיאה בטעינת נתונים";
+    }
+}
+
+function renderDashboard(data) {
+    const totalScanned = data.length > 0 ? data[data.length - 1].total : 0;
+    const percent = totalScanned / TARGET;
+    const target85 = TARGET * 0.85;
+    const rem85 = Math.max(target85 - totalScanned, 0);
+    const rem100 = Math.max(TARGET - totalScanned, 0);
+    const today = new Date();
+    const daysLeft = Math.max(0, Math.ceil((END_DATE - today) / 86400000));
+    const dailyReq = daysLeft > 0 ? Math.ceil(rem85 / daysLeft) : 0;
+
+    document.getElementById("kpiTotal").textContent = totalScanned.toLocaleString();
+    document.getElementById("kpiPercent").textContent = (percent * 100).toFixed(2) + "%";
+    document.getElementById("kpiRem85").textContent = Math.round(rem85).toLocaleString();
+    document.getElementById("kpiRem100").textContent = Math.round(rem100).toLocaleString();
+    document.getElementById("kpiDays").textContent = daysLeft;
+    document.getElementById("kpiDaily").textContent = dailyReq.toLocaleString();
+
+    const cel = document.getElementById("celebration");
+    if (totalScanned >= TARGET) {
+        cel.className = "celebration green";
+        cel.textContent = "🎉🎉🎉 מזל טוב! הגעתם ל-100% מהיעד! 🎉🎉🎉";
+    } else if (totalScanned >= target85) {
+        cel.className = "celebration gold";
+        cel.textContent = `🎉🎉 מזל טוב! הגעתם ל-${(percent * 100).toFixed(1)}% מהיעד! 🎉🎉`;
+    } else {
+        cel.className = "celebration"; cel.textContent = "";
+    }
+
+    const dates = data.map(d => d.date);
+    const totals = data.map(d => d.total);
+    const scanned = data.map(d => d.scanned);
+
+    if (chartCumulative) chartCumulative.destroy();
+    if (chartDaily) chartDaily.destroy();
+
+    chartCumulative = new Chart(document.getElementById("chartCumulative"), {
+        type: "line",
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'סה"כ נסרק',
+                data: totals,
+                borderColor: "#3498db",
+                backgroundColor: "rgba(52,152,219,0.1)",
+                fill: true, tension: 0.3, pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    chartDaily = new Chart(document.getElementById("chartDaily"), {
+        type: "bar",
+        data: {
+            labels: dates,
+            datasets: [{
+                label: "נסרק היום",
+                data: scanned,
+                backgroundColor: "#2ecc71"
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    document.getElementById("tableBody").innerHTML = data.map(d =>
+        `<tr><td>${d.date}</td><td>${d.scanned.toLocaleString()}</td><td>${d.total.toLocaleString()}</td></tr>`
+    ).join("");
+
+    if (data.length > 0) {
+        document.getElementById("btnDeleteLast").textContent = `🗑️ מחק יום אחרון (${data[data.length - 1].date})`;
+    }
+}
+
+function toggleTable() {
+    const container = document.getElementById("tableContainer");
+    const toggle = document.getElementById("tableToggle");
+    if (container.style.display === "none") {
+        container.style.display = "block";
+        toggle.textContent = "📋 הסתר נתונים מלאים ▲";
+    } else {
+        container.style.display = "none";
+        toggle.textContent = "📋 הצג נתונים מלאים ▼";
+    }
+}
+</script>
+</body>
+</html>
