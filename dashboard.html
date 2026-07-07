@@ -10,19 +10,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #333; }
 
-        #loginScreen {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        #loginScreen h1 { color: #fff; font-size: 2.5rem; margin-bottom: 2rem; }
-        #loginScreen input { padding: 12px 20px; font-size: 1.1rem; border: none; border-radius: 8px;
-            width: 260px; text-align: center; outline: none; }
-        #loginScreen button { padding: 12px 30px; font-size: 1.1rem; border: none; border-radius: 8px;
-            background: #4CAF50; color: #fff; cursor: pointer; margin-top: 1rem; width: 260px; font-weight: bold; }
-        #loginScreen button:hover { background: #45a049; }
-        #loginError { color: #ff6b6b; margin-top: 0.5rem; font-size: 0.95rem; }
-
-        #dashboard { display: none; max-width: 1300px; margin: 0 auto; padding: 15px; }
+        #dashboard { max-width: 1300px; margin: 0 auto; padding: 15px; }
 
         .header { text-align: center; padding: 20px 0; }
         .header h1 { font-size: 2rem; color: #2c3e50; }
@@ -55,8 +43,7 @@
         .btn-delete:hover { background: #c0392b; }
         .btn-reset { background: #e67e22; }
         .btn-reset:hover { background: #d35400; }
-        .btn-logout { background: #95a5a6; }
-        .btn-logout:hover { background: #7f8c8d; }
+
 
         .msg { padding: 10px; border-radius: 8px; margin-top: 8px; text-align: center; display: none; font-weight: bold; }
         .msg.success { background: #d4edda; color: #155724; display: block; }
@@ -86,14 +73,6 @@
 </head>
 <body>
 
-<!-- מסך כניסה -->
-<!--<div id="loginScreen">
-    <h1>🔐 דשבורד סריקת מסמכים</h1>
-    <input type="password" id="passwordInput" placeholder="הכנס סיסמה" autocomplete="off">
-    <button onclick="login()">🔓 כניסה</button>
-    <div id="loginError"></div>
-</div>-->
-
 <!-- דשבורד -->
 <div id="dashboard">
     <div class="header"><h1>📄 דשבורד סריקת מסמכים</h1></div>
@@ -113,7 +92,6 @@
         </div>
         <div>
             <h2>👤</h2>
-            <button class="btn-logout" onclick="logout()">🚪 יציאה</button>
         </div>
     </div>
     <div class="msg" id="msg"></div>
@@ -154,7 +132,6 @@
 // ====== הגדרות ======
 const TARGET = 2000000;
 const END_DATE = new Date(2026, 11, 31);
-const APP_PASSWORD = "ganzach2424";
 const SHEET_ID = "1bXuXqZ4VLHR0bdBNveTENPK23a91LzzHlSKUqP1O0ZM";
 
 // ====== מפתח Service Account ======
@@ -286,28 +263,6 @@ async function sheetsReset() {
         })
     });
     return resp.ok;
-}
-
-// ====== כניסה ======
-function login() {
-    const pw = document.getElementById("passwordInput").value;
-    if (pw === APP_PASSWORD) {
-        document.getElementById("loginScreen").style.display = "none";
-        document.getElementById("dashboard").style.display = "block";
-        document.getElementById("loginError").textContent = "";
-        loadAndRender();
-    } else {
-        document.getElementById("loginError").textContent = "❌ סיסמה שגויה";
-        document.getElementById("passwordInput").value = "";
-    }
-}
-document.getElementById("passwordInput").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
-
-function logout() {
-    document.getElementById("loginScreen").style.display = "flex";
-    document.getElementById("dashboard").style.display = "none";
-    document.getElementById("passwordInput").value = "";
-    accessToken = null;
 }
 
 // ====== פעולות ======
@@ -465,6 +420,9 @@ function toggleTable() {
         toggle.textContent = "📋 הצג נתונים מלאים ▼";
     }
 }
+
+// טעינה אוטומטית — ללא סיסמה
+document.addEventListener("DOMContentLoaded", () => loadAndRender());
 </script>
 </body>
 </html>
